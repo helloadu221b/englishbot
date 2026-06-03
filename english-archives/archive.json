@@ -1,0 +1,37 @@
+[
+  {
+    "id": "POST_1",
+    "title": "Introduction to Determiners",
+    "content": "✨ **Introduction to Determiners** ✨\n\n📖 **Definition**: Any word or kind of words that determine the **identity** or the **quantity** of a noun is called a determiner.\n\n💡 **Core Concepts** 💡\n📍 **Placement**: Determiners always come **BEFORE** the noun.\n🎯 **Core Functions**:\n1️⃣ **Identity**: Identifies *which* specific noun is being discussed (e.g., *These* books, *His* books).\n2️⃣ **Quantity**: Specifies *how much* or *how many* (e.g., *Many* books, *Five* books).\n\n📊 **Classification Table** 📊\n| Identity Words 🆔 | Quantity Words 🔢 |\n|---|---|\n| **Possessives**: my, your, our, their, his | **Numbers**: 1, 2, 3, first, second... |\n| **Articles**: a, an, the | **Quantifiers**: many, some, all, both... |\n| **Demonstratives**: this, that, these... | few, little, several, whole, other... |\n\n🧠 **Revision Tip**: Remember! Anything that describes the **quality** (e.g., *beautiful*, *smart*) is an **Adjective**, not a determiner. 🚫\n\n#Chapter1 #Determiners #Introduction",
+    "type": "news",
+    "revision_count": 0
+  },
+  {
+    "id": "POST_2",
+    "title": "Usage of Another and Other",
+    "content": "🔄 **Concept: Another vs. Other** 🔄\n\n📖 **Rule/Definition**\n▪️ **Another**: Used specifically with **singular countable nouns**.\n▪️ **Other**: Used when the following noun is **plural**.\n\n❌ *Incorrect*: \"...ask students to attempt **other** exercise.\"\n✅ *Correct*: \"...ask students to attempt **another** exercise.\" (**Exercise = Singular**)\n\n❌ *Incorrect*: \"...revise **another** concepts.\"\n✅ *Correct*: \"...revise **other** concepts.\" (**Concepts = Plural**)\n\n🧠 **The Confusion Trap** (Pedagogical Note) ⚠️\nSimply looking at the noun can be a trap! \n1️⃣ If the context suggests a **singular approach**, *do not* change the plural noun; instead, **change 'another' to 'other'** to match the intended meaning if appropriate, or ensure the determiner fits the specific noun number context provided. \n2️⃣ If context suggests **multiple methods**, *do not* change the singular noun; **instead change 'other' to 'another'** or vice-versa to ensure the logic of the sentence remains intact according to the number of the noun.\n\n#Chapter1 #Determiners #AnotherVsOther",
+    "type": "news",
+    "revision_count": 0
+  },
+  {
+    "id": "POST_3",
+    "title": "The Rule of Multiple Identity Determiners",
+    "content": "🚫 **The Double Identity Trap** 🚫\n\n📖 **Rule**: Two identity words (determiners) **cannot** be used together.\n\n💡 **Linguistic Breakdown**\n▪️ The word ***another*** is technically **an + other**.\n▪️ Adding an identity word (like *'the'* or *'my'*) before it creates a conflict with the internal article *'an'*.\n\n📝 **Correction Logic** 📝\n| Incorrect Sentence ❌ | Identity Words 🆔 | Corrected Sentence ✅ |\n|---|---|---|\n| \"Have you solved **the another** puzzle?\" | **the** (Art) + **another** | \"Have you solved **the other** puzzle?\" |\n| \"...gifted by **my another** uncle.\" | **my** (Poss) + **another** | \"...gifted by **my other** uncle.\" |\n\n🧠 **Key Note**: Even if the noun is singular (*puzzle*, *uncle*), ***another*** is blocked by the preceding identity word. Use **'other'** instead! 🛡️\n\n#Chapter1 #Determiners #DoubleIdentity",
+    "type": "news",
+    "revision_count": 0
+  },
+  {
+    "id": "POST_4",
+    "title": "Distinguishing 'Another' vs. 'The Other'",
+    "content": "⚖️ **Another vs. The Other** ⚖️\n\n💡 **Core Difference: Indefinite vs. Definite**\n▪️ ***Another*** (**Indefinite**): Uses article *'an'*. Refers to a non-specific item among many. 🎲\n▪️ ***The Other*** (**Definite**): Uses article *'the'*. Refers to a specific, unique item. 🎯\n\n📏 **The Selection Rules** 📏\n1️⃣ **Set of Only Two** (e.g., hands, eyes): Mentioning one makes the second one **definite**. \n   ➡️ Rule: Use **'The Other'**.\n   *Example*: \"...eating ice cream with **the other** [hand].\"\n2️⃣ **Multiple Options** (e.g., fingers, questions): Mentioning one leaves several non-specific options.\n   ➡️ Rule: Use **'Another'**.\n   *Example*: \"...a diamond ring in **another** finger.\"\n\n🌍 **Contextual Definiteness**: If a noun is the *only one of its kind* in a specific context (e.g., the *only* President at a specific Summit), it is **Definite**. Use **'The'**! \n\n#Chapter1 #Determiners #DefiniteVsIndefinite",
+    "type": "news",
+    "revision_count": 0
+  },
+  {
+    "id": "POST_5",
+    "title": "Usage with Uncountable Nouns",
+    "content": "💧 **Determiners & Uncountable Nouns** 💧\n\n📖 **The Restriction**\nIndefinite determiners like ***'a'***, ***'an'***, or ***'another'*** **CANNOT** be used with uncountable nouns (e.g., water, information, advice). 🚫\n\n💡 **The Rule**\nOnly the definite article ***'the'*** (and thus ***'the other'***) can be used with uncountable nouns to specify them.\n\n🔄 **Quick Comparison** 🔄\n| Noun Type | Indefinite (Any) | Definite (Specific) |\n|---|---|---|\n| **Countable Singular** | Another | The Other |\n| **Uncountable Singular** | *Not Applicable* | The Other |\n\n#Chapter1 #Determiners #UncountableNouns",
+    "type": "news",
+    "revision_count": 0
+  }
+]
