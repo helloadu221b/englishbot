@@ -736,7 +736,9 @@ async def github_backup_file(filename: str) -> tuple[bool, str]:
     import base64
     encoded = base64.b64encode(raw).decode()
 
-    repo_path = f"{GITHUB_BACKUP_PATH}/{filename}" if GITHUB_BACKUP_PATH else filename
+    # Strip trailing slashes from path, then build full repo path
+    clean_path = GITHUB_BACKUP_PATH.strip("/") if GITHUB_BACKUP_PATH else ""
+    repo_path  = f"{clean_path}/{filename}" if clean_path else filename
 
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     url     = f"https://api.github.com/repos/{GITHUB_BACKUP_REPO}/contents/{repo_path}"
@@ -744,6 +746,8 @@ async def github_backup_file(filename: str) -> tuple[bool, str]:
         "Authorization": f"token {GITHUB_TOKEN}",
         "Accept":        "application/vnd.github+json",
     }
+
+    print(f"🐙 GitHub backup → {GITHUB_BACKUP_REPO}/{repo_path}")
 
     async with httpx.AsyncClient(timeout=20) as client:
         sha  = None
@@ -761,9 +765,16 @@ async def github_backup_file(filename: str) -> tuple[bool, str]:
         put_resp = await client.put(url, headers=headers, json=payload)
 
     if put_resp.status_code in (200, 201):
-        return True, f"✅ Backed up to: {GITHUB_BACKUP_REPO}/{repo_path}"
+        return True, f"✅ Backed up to: `{GITHUB_BACKUP_REPO}/{repo_path}`"
     elif put_resp.status_code == 404:
-        return False, f"❌ Repo not found: '{GITHUB_BACKUP_REPO}'. Make sure it exists on GitHub and your token has 'repo' scope."
+        return False, f"❌ Repo not found: `{GITHUB_BACKUP_REPO}`. Make sure it exists and your token has repo scope."
+    elif put_resp.status_code == 409:
+        return False, (
+            f"❌ Path conflict in `{GITHUB_BACKUP_REPO}`.\n"
+            f"Tried to write to: `{repo_path}`\n"
+            f"A file already exists where a folder is expected.\n"
+            f"Fix: delete the conflicting file in GitHub, or change GITHUB_BACKUP_PATH."
+        )
     else:
         err = put_resp.text[:300].replace("`", "'")
         return False, f"❌ GitHub API error {put_resp.status_code}: {err}"
