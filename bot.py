@@ -1,6 +1,7 @@
 import json
 import asyncio
 import os
+import httpx
 from datetime import datetime, timezone, timedelta
 
 from telegram import Update
@@ -15,6 +16,10 @@ from telegram.ext import (
 BOT_TOKEN  = os.environ["BOT_TOKEN"]
 CHANNEL_ID = os.environ["CHANNEL_ID"]   # used only for first-time init
 ADMIN_ID   = int(os.environ["ADMIN_ID"])
+
+GITHUB_TOKEN       = os.environ.get("GITHUB_TOKEN", "")
+GITHUB_BACKUP_REPO = os.environ.get("GITHUB_BACKUP_REPO", "").rstrip("/").replace("https://github.com/", "").replace("http://github.com/", "")
+GITHUB_BACKUP_PATH = os.environ.get("GITHUB_BACKUP_PATH", "")   # e.g. "englishbot" — subfolder inside the repo
 
 # POSTING SCHEDULE (24h format, local server time)
 POST_HOUR_START = 4   # 4 AM
@@ -229,11 +234,37 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not document:
         return
 
-    # DOWNLOAD AND READ FILE
+    # DOWNLOAD FILE
     file = await context.bot.get_file(document.file_id)
     file_name = document.file_name
     await file.download_to_drive(file_name)
 
+    # ── RESTORE MODE ──────────────────────────────────────────────
+    if context.user_data.get("awaiting_restore"):
+        context.user_data["awaiting_restore"] = False
+
+        try:
+            data = load_json(file_name)
+        except Exception:
+            await update.message.reply_text("❌ Could not read file. Make sure it is valid JSON.")
+            return
+
+        if not isinstance(data, list):
+            await update.message.reply_text("❌ Restore file must be a JSON list `[...]`.")
+            return
+
+        old_count = len(load_json("archive.json"))
+        save_json("archive.json", data)
+
+        await update.message.reply_text(
+            f"✅ *Archive restored!*\n\n"
+            f"📦 Old archive: {old_count} posts\n"
+            f"📦 New archive: {len(data)} posts",
+            parse_mode="Markdown"
+        )
+        return
+
+    # ── NORMAL ADD MODE ───────────────────────────────────────────
     try:
         new_items = load_json(file_name)
     except Exception:
@@ -333,7 +364,15 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📂 /archive [page] — Browse all archived posts\n"
         "👁 /viewpost POST\\_ID — View full content of a post\n"
         "🗑 /deletepost POST\\_ID — Delete a post from archive\n"
-        "🔼 /requeue POST\\_ID — Move a post to front of queue"
+        "🔼 /requeue POST\\_ID — Move a post to front of queue\n\n"
+
+        "━━━━━━━━━━━━━━━━━━\n"
+        "💾 *BACKUP & RESTORE*\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "📦 /backup — Send archive.json file to this chat\n"
+        "♻️ /restore — Replace archive with an uploaded file\n"
+        "🐙 /githubbackup — Push archive to GitHub now\n"
+        "⏰ Auto GitHub backup also runs daily at 2 AM"
     )
 
     await update.message.reply_text(text, parse_mode="Markdown")
@@ -349,7 +388,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "⚡ /next — Force post next item now\n"
         "⏭ /skip — Skip next item in queue\n"
         "📋 /queue — List all pending posts\n"
-        "🗑 /clear — Clear entire queue\n"
+        "🗑 /clear — Clear queue (asks confirm)\n"
+        "🗑 /clearqueue — Clear queue instantly\n"
         "🕒 /setinterval 30 — Change interval\n"
         "📈 /revision — Top revised posts\n"
         "📊 /poll — Post next MCQ as quiz poll\n\n"
@@ -360,7 +400,11 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📂 /archive [page] — Browse archived posts\n"
         "👁 /viewpost POST\\_ID — View a post\n"
         "🗑 /deletepost POST\\_ID — Delete a post\n"
-        "🔼 /requeue POST\\_ID — Re-queue a post\n\n"
+        "🔼 /requeue POST\\_ID — Re-queue a post\n"
+        "🗑 /cleararchive — Delete all archived posts\n\n"
+        "💾 /backup — Send archive.json to this chat\n"
+        "♻️ /restore — Replace archive with an uploaded file\n"
+        "🐙 /githubbackup — Push archive to GitHub now\n\n"
         "🆘 /help — Show this list"
     )
 
@@ -520,6 +564,7 @@ async def cmd_confirmclear(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["awaiting_clear_confirm"] = False
+    context.user_data["awaiting_restore"] = False
     await update.message.reply_text("✅ Cancelled.")
 
 
@@ -674,6 +719,181 @@ async def cmd_removechannel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ─────────────────────────────────────────
+# BACKUP HELPERS
+# ─────────────────────────────────────────
+
+async def github_backup_file(filename: str) -> tuple[bool, str]:
+    """Upload a local file to the GitHub backup repo. Returns (success, message)."""
+    if not GITHUB_TOKEN or not GITHUB_BACKUP_REPO:
+        return False, "GITHUB_TOKEN or GITHUB_BACKUP_REPO env var not set."
+
+    try:
+        with open(filename, "rb") as f:
+            raw = f.read()
+    except FileNotFoundError:
+        return False, f"`{filename}` not found on disk."
+
+    import base64
+    encoded = base64.b64encode(raw).decode()
+
+    repo_path = f"{GITHUB_BACKUP_PATH}/{filename}" if GITHUB_BACKUP_PATH else filename
+
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    url     = f"https://api.github.com/repos/{GITHUB_BACKUP_REPO}/contents/{repo_path}"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept":        "application/vnd.github+json",
+    }
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        sha  = None
+        resp = await client.get(url, headers=headers)
+        if resp.status_code == 200:
+            sha = resp.json().get("sha")
+
+        payload = {
+            "message": f"backup: {repo_path} — {now_str}",
+            "content": encoded,
+        }
+        if sha:
+            payload["sha"] = sha
+
+        put_resp = await client.put(url, headers=headers, json=payload)
+
+    if put_resp.status_code in (200, 201):
+        return True, f"✅ Backed up to: {GITHUB_BACKUP_REPO}/{repo_path}"
+    elif put_resp.status_code == 404:
+        return False, f"❌ Repo not found: '{GITHUB_BACKUP_REPO}'. Make sure it exists on GitHub and your token has 'repo' scope."
+    else:
+        err = put_resp.text[:300].replace("`", "'")
+        return False, f"❌ GitHub API error {put_resp.status_code}: {err}"
+
+
+async def _run_github_backup() -> list[str]:
+    """Shared logic: backs up archive.json and returns result lines."""
+    results = []
+    for filename in ["archive.json"]:
+        ok, msg = await github_backup_file(filename)
+        results.append(msg)
+        print(msg)
+    return results
+
+
+# ─────────────────────────────────────────
+# /backup COMMAND
+# ─────────────────────────────────────────
+
+async def cmd_backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update):
+        await deny(update)
+        return
+
+    await update.message.reply_text("📦 Preparing backup...")
+
+    files_to_send = ["archive.json"]
+    sent, skipped = 0, 0
+
+    for filename in files_to_send:
+        try:
+            with open(filename, "rb") as f:
+                content = f.read()
+
+            if content.strip() in (b"", b"[]", b"{}"):
+                await update.message.reply_text(f"⚠️ `{filename}` is empty — skipped.")
+                skipped += 1
+                continue
+
+            await context.bot.send_document(
+                chat_id=update.effective_chat.id,
+                document=content,
+                filename=filename,
+                caption=f"📁 {filename} — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
+            )
+            sent += 1
+
+        except FileNotFoundError:
+            await update.message.reply_text(f"❌ `{filename}` not found on disk.")
+            skipped += 1
+        except Exception as e:
+            await update.message.reply_text(f"❌ Failed to send `{filename}`: {e}")
+            skipped += 1
+
+    summary = f"✅ Backup complete — {sent} file(s) sent."
+    if skipped:
+        summary += f" {skipped} skipped."
+    await update.message.reply_text(summary)
+
+
+# ─────────────────────────────────────────
+# /restore COMMAND
+# ─────────────────────────────────────────
+
+async def cmd_restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update):
+        await deny(update)
+        return
+
+    context.user_data["awaiting_restore"] = True
+    await update.message.reply_text(
+        "📂 *Restore mode activated.*\n\n"
+        "Send me your `archive.json` file now.\n\n"
+        "⚠️ This will *completely replace* the current archive.\n"
+        "The queue will not be affected.\n\n"
+        "Send /cancel to abort.",
+        parse_mode="Markdown"
+    )
+
+
+# ─────────────────────────────────────────
+# /githubbackup COMMAND + AUTO BACKUP
+# ─────────────────────────────────────────
+
+async def cmd_githubbackup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update):
+        await deny(update)
+        return
+
+    if not GITHUB_TOKEN or not GITHUB_BACKUP_REPO:
+        await update.message.reply_text(
+            "❌ *GitHub backup not configured.*\n\n"
+            "Set the following env vars:\n"
+            "• `GITHUB_TOKEN` — Personal Access Token with repo scope\n"
+            "• `GITHUB_BACKUP_REPO` — e.g. `youruser/backup-repo`\n"
+            "• `GITHUB_BACKUP_PATH` — optional subfolder, e.g. `englishbot`",
+            parse_mode="Markdown"
+        )
+        return
+
+    await update.message.reply_text("🐙 Pushing backup to GitHub...")
+    results = await _run_github_backup()
+    await update.message.reply_text("🗄 GitHub Backup Result\n\n" + "\n".join(results))
+
+
+async def auto_github_backup(context: ContextTypes.DEFAULT_TYPE):
+    """Runs every day at 02:00 server time. Uploads archive.json to GitHub backup repo."""
+    print("🔄 Running scheduled GitHub backup...")
+
+    if not GITHUB_TOKEN or not GITHUB_BACKUP_REPO:
+        print("⚠️ GitHub backup skipped — GITHUB_TOKEN or GITHUB_BACKUP_REPO not configured.")
+        try:
+            await context.bot.send_message(
+                chat_id=ADMIN_ID,
+                text="⚠️ *GitHub Backup Skipped*\n\nSet `GITHUB_TOKEN` and `GITHUB_BACKUP_REPO` env vars to enable automatic backups.",
+                parse_mode="Markdown",
+            )
+        except Exception:
+            pass
+        return
+
+    results = await _run_github_backup()
+    report  = "🗄 Daily GitHub Backup\n\n" + "\n".join(results)
+    try:
+        await context.bot.send_message(chat_id=ADMIN_ID, text=report)
+    except Exception as e:
+        print(f"⚠️ Could not send backup report to admin: {e}")
+
+
+# ─────────────────────────────────────────
 # DAILY REPORT
 # ─────────────────────────────────────────
 
@@ -696,7 +916,17 @@ async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
         text=report,
         parse_mode="Markdown"
     )
-    print("📅 Daily report sent to admin")
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    filename = f"archive_{today}.json"
+    archive_bytes = json.dumps(archive, ensure_ascii=False, indent=2).encode("utf-8")
+    await context.bot.send_document(
+        chat_id=ADMIN_ID,
+        document=archive_bytes,
+        filename=filename,
+        caption=f"📦 Archive backup — {today}"
+    )
+    print("📅 Daily report + archive sent to admin")
 
 
 # ─────────────────────────────────────────
@@ -1117,11 +1347,20 @@ app.add_handler(CommandHandler("deletepost",    cmd_deletepost))
 app.add_handler(CommandHandler("requeue",       cmd_requeue))
 app.add_handler(CommandHandler("clearqueue",    cmd_clearqueue))
 app.add_handler(CommandHandler("cleararchive",  cmd_cleararchive))
+app.add_handler(CommandHandler("backup",        cmd_backup))
+app.add_handler(CommandHandler("restore",       cmd_restore))
+app.add_handler(CommandHandler("githubbackup",  cmd_githubbackup))
 
 # DAILY REPORT — every day at 11 PM
 app.job_queue.run_daily(
     send_daily_report,
     time=datetime.now().replace(hour=23, minute=0, second=0).time()
+)
+
+# GITHUB BACKUP — every day at 2 AM
+app.job_queue.run_daily(
+    auto_github_backup,
+    time=datetime.now().replace(hour=2, minute=0, second=0).time()
 )
 
 # AUTO POST WATCHDOG — restarts auto_post if it ever crashes
