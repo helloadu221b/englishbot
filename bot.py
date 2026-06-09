@@ -430,7 +430,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📰 Queue: {len(queue)} posts\n"
         f"📦 Archive: {len(archive)} posts\n"
         f"✅ Posts sent this session: {posts_sent}\n"
-        f"🕐 Last posted: {last_posted or 'None'}\n"
+        f"🕐 Last posted: `{last_posted or 'None'}`\n"
         f"⏱ Uptime: {hours}h {minutes}m\n"
         f"⏰ Posting hours: {POST_HOUR_START}:00 AM – {POST_HOUR_END}:00 PM\n"
         f"🕒 Interval: {POST_INTERVAL // 60} minutes\n"
